@@ -1,133 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<title>Trader</title>
-<script
-  src="https://code.jquery.com/jquery-3.1.1.js"
-  integrity="sha256-16cdPddA6VdVInumRGo6IbivbERE8p7CQR3HzTBuELA="
-  crossorigin="anonymous"></script>
-<script type="text/javascript">
-    var conn;
+    <title>Trader</title>
+    <script src="https://code.jquery.com/jquery-3.1.1.js" integrity="sha256-16cdPddA6VdVInumRGo6IbivbERE8p7CQR3HzTBuELA=" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+        var conn;
+		
+		
+		function connect(){
+			  var userid = $('#userid').val();
+			
+			if (userid==""){
+		alert("Input userid")				
+				return;
+			}
 
-window.onload = function () {
-  
+			  if (window["WebSocket"]) {
+                conn = new WebSocket("ws://{{$}}/ws?token="+userid);
+                conn.onopen = function(evt) {
+                    console.log("open,", evt);
+                    conn.send(JSON.stringify({
+                        "type": "register",
+                        data: {
+                            name: "F"
+                        }
+                    }))
+                    conn.send(JSON.stringify({
+                        "type": "list",
+                        data: {
+                            symbol: "F",
+                            quantity: 8
+                        }
+                    }))
 
-    if (window["WebSocket"]) {
-        conn = new WebSocket("ws://{{$}}/ws?token=dsfgsdhjf");
-        conn.onclose = function (evt) {
-			console.log("close",evt)
-           };
-        conn.onmessage = function (evt) {
-         console.log("onmessage",evt.data)
-       var response=$.parseJSON(evt.data);
-        console.log(response.type)
-		actionOnResponse(response)
+                    			$("#trade").show();
 
-        };
-    } else {
-        var item = document.createElement("div");
-        item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
-     }
-	
-	
-	$( "#getQuote" ).click(function() {
-	console.log("Getting quote")
- var symbol=$('#symbol').val();
-  var ask ={};
-ask.type="api";
-ask.data={};
-ask.data.name=symbol;
-	console.log("Getting quote for",ask)
+                }
+                conn.onclose = function(evt) {
+                    console.log("close", evt)
+                };
+                conn.onmessage = function(evt) {
+                    console.log("onmessage", evt.data)
+                    var response = $.parseJSON(evt.data);
+                    console.log(response.type)
+                    actionOnResponse(response)
 
-conn.send(JSON.stringify(ask))
+                };
+            } else {
+                var item = document.createElement("div");
+                item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
+            }
+		}
 
-
-});
-
-
-
-function actionOnResponse(response){
-	
-	console.log(response.type)
-	switch (response.type){
-		case "api": apiAction(response)
-		break;
-		case "me": fillProfile(response)
-		break;
-		default:console.log("no action required")
- 	}
-}
-
-function apiAction(response){
-	
-	  console.log(response)
-	$("#sym").text(response.data.askPrice);
-	$("#name").text(response.data.name);
-	$("#bid").text(response.data.bidPrice);
-	$("#ask").text(response.data.askPrice);
-	
-}
-
-function fillProfile(response){
-   console.log(response)
-	$("#sym").text(response.data.askPrice);
-	$("#name").text(response.data.name);
-	$("#bid").text(response.data.bidPrice);
-	$("#ask").text(response.data.askPrice);
+        window.onload = function() {
+			
+			$("#trade").hide();
 
 
-}
-	
+          
+
+
+            $("#getQuote").click(function() {
+                console.log("Getting quote")
+                var symbol = $('#symbol').val();
+                var ask = {};
+                ask.type = "api";
+                ask.data = {};
+                ask.data.name = symbol;
+                console.log("Getting quote for", ask)
+
+                conn.send(JSON.stringify(ask))
+
+
+            });
+
+            $("#buy").click(function() {
+                console.log("Buy")
+                $("#getQuote").click();
+                var symbol = $('#symbol').val();
+                var quantity = $('#quantity').val();
+
+                var ask = {};
+                ask.type = "buy";
+                ask.data = {};
+                ask.data.symbol = symbol;
+                ask.data.quantity = parseInt(quantity);
+                console.log(ask)
+
+                conn.send(JSON.stringify(ask))
+
+
+            });
+
+
+            $("#sell").click(function() {
+                console.log("Buy")
+                $("#getQuote").click();
+                var symbol = $('#symbol').val();
+                var quantity = $('#quantity').val();
+
+                var ask = {};
+                ask.type = "sell";
+                ask.data = {};
+                ask.data.symbol = symbol;
+                ask.data.quantity = parseInt(quantity);
+                console.log(ask)
+
+                conn.send(JSON.stringify(ask))
+
+
+            });
+
 };
 
 
+            function actionOnResponse(response) {
 
+                console.log(response.type)
+                switch (response.type) {
+                    case "api":
+                        apiAction(response)
+                        break;
+                    case "me":
+                        fillProfile(response)
+                        break;
+                    case "message":
+                        message(response)
+                        break;
+                    case "list":
+                        list(response)
+                        break;
+                    default:
+                        console.log("no action required")
+                }
+            }
 
-</script>
+            function list(response) {
+                $("#list").find("tr:gt(0)").remove();
+                $.each(response.data, function(key, value) {
+                    console.log(value)
+                    $('#list').append('<tr><td>' + value.Company + '</td><td>' + value.Quantity + '</td><td>' + value.PricePaid + '</td><td><button onClick=viewStock("' + value.Symbol + '")>View Stocks</button></td></tr>');
+                });
+            }
+
+            function message(response) {
+                conn.send(JSON.stringify({
+                    "type": "register",
+                    data: {
+                        name: "F"
+                    }
+                }))
+                conn.send(JSON.stringify({
+                    "type": "list",
+                    data: {
+                        symbol: "F",
+                        quantity: 8
+                    }
+                }))
+                alert(response.data)
+            }
+
+            function apiAction(response) {
+
+                console.log(response)
+                $("#sym").text(response.data.askPrice);
+                $("#name").text(response.data.name);
+                $("#bid").text(response.data.bidPrice);
+                $("#ask").text(response.data.askPrice);
+
+            }
+
+            function fillProfile(response) {
+                console.log(response)
+                $("#bal").text(response.data.Balance);
+                $("#user").text(response.data.UserId);
+                conn.send(JSON.stringify({
+                    "type": "list",
+                    data: {
+                        symbol: "F",
+                        quantity: 8
+                    }
+                }))
+
+            }
+
+        
+
+        function viewStock(sym) {
+            alert(sym);
+            $("#symbol").val = sym;
+            $("#getQuote").click();
+        }
+    </script>
 </head>
+
 <body>
 
+<input id="userid" placeholder="username"/>
+<button onclick="connect()">Connect</button>
+<div id="trade">
+    <input id="symbol" value="F" />
+    <button id="getQuote">Get Quote</button>
 
- 
-<input  id="symbol" value="F" />
-<button id="getQuote">Get Quote</button>
 
-
-<br>
-<br>
-symbol: <span id="sym"></span> <br>
-Name: <span id="name"></span><br>
-Bid: <span id="bid"></span><br>
-Ask: <span id="ask"></span><br>
-<input  id="quantity" value="100" />
-<button id="buy">Buy</button>
-<button id="sell">Sell</button>
+    <br>
+    <br> symbol: <span id="sym"></span> <br> Name: <span id="name"></span><br> Bid: <span id="bid"></span><br> Ask: <span id="ask"></span><br>
+    <input id="quantity" value="100" type="number" placeholder="Quantity" />
+    <button id="buy">Buy</button>
+    <button id="sell">Sell</button><br> Balance: <span id="bal"></span> <br> User: <span id="user"></span> <br>
 
 
 
 
-<hr>
-<br>
-<br>
 
-<table>
-  <tr>
-    <th>Company</th>
-    <th>Quantity</th>
-    <th>Price Paid</th>
-    <th>Price Paid</th>
-  </tr>
-  <tr>
-    <td>January</td>
-    <td>$100</td>
-    <td>January</td>
-    <td>$100</td>
-  </tr>
-</table>
-<div id="log"></div>
-<form id="form">
-    <input type="submit" value="Send" />
-    <input type="text" id="msg" size="64"/>
-</form>
+    <hr>
+    <br>
+    <br>
+
+    <table id="list">
+        <tr>
+            <th>Company</th>
+            <th>Quantity</th>
+            <th>Price Paid</th>
+            <th>Price Paid</th>
+        </tr>
+    </table>
+	
+	</div>
+
 </body>
+
 </html>

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"gopkg.in/mgo.v2/bson"
 )
 
 const (
@@ -19,6 +18,14 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	maxMessageSize = 512
+)
+
+//database constant
+const (
+	dbUserTable  = "user"
+	dbStockTable = "stock"
+
+	dbUserId = "userid"
 )
 
 var (
@@ -39,8 +46,8 @@ type Client struct {
 }
 
 type User struct {
-	id      string
-	balance int
+	UserId  string
+	Balance int
 }
 
 type MessageData struct {
@@ -77,30 +84,147 @@ func (c *Client) readPump() {
 		case "register":
 			{
 				log.Println("-----")
-				col := database.C("user")
-				count, er := col.Find(bson.M{"id": c.id}).Count()
+				col := database.C(dbUserTable)
+				u, er := getUser(c.id)
 				if er != nil {
-					log.Println("Count err", er)
-				}
-				if count == 0 {
-					er = col.Insert(&User{c.id, 10000})
+					//create new user
+					u.UserId = c.id
+					u.Balance = 10000
+					er = col.Insert(u)
 					if er == nil {
 						fmt.Println("User registered")
 
 					}
 				}
-				fmt.Println("user", count)
+
+				c.conn.WriteJSON(ResponseData{Typeofdata: "me", Data: u})
 
 			}
 		case "api":
 			{
 				log.Println("m.Data", m.Data["name"])
-				i, e := getQuote(m.Data["name"].(string))
+				name, ie := m.Data["name"].(string)
+				if !ie {
+					fmt.Println("Error ", ie)
+					break
+
+				}
+				i, e := getQuote(name)
 				if e != nil {
 					fmt.Println("Error ", e)
+					break
+				}
+				if i == nil {
+					c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Wrong stock symbol"})
+					break
 				}
 				log.Println("-----", i)
 				c.conn.WriteJSON(ResponseData{Typeofdata: "api", Data: i})
+			}
+		case "buy":
+			{
+				symbol, b := m.Data["symbol"].(string)
+				if !b {
+					fmt.Println("Error  mbol].(string)", b)
+
+					break
+				}
+				quantity, ok := m.Data["quantity"].(float64)
+				if !ok {
+					fmt.Println("Error  .(float64)", ok)
+					break
+				}
+				log.Println(symbol)
+				log.Println(quantity)
+				price, company, askerror := getAskPriceAndName(symbol)
+				if askerror != nil {
+					fmt.Println("askerror ", askerror)
+					break
+				}
+				total := price * float64(quantity)
+				fmt.Println(total)
+
+				u, err := getUser(c.id)
+				if err != nil {
+					fmt.Println("get user err", err)
+
+					break
+				}
+				fmt.Println(u)
+
+				if float64(u.Balance) >= total {
+					fmt.Println("Buy stock")
+					u.Balance = u.Balance - int(total)
+					err := addStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, PricePaid: total, Company: company})
+					if err != nil {
+						fmt.Println(err)
+					}
+					updateUser(&u)
+					c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Stock Added"})
+
+				} else {
+					c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Not Enough Balance"})
+
+				}
+
+			}
+		case "list":
+			{
+				stocks := getPortfolio(c.id)
+				c.conn.WriteJSON(ResponseData{Typeofdata: "list", Data: stocks})
+
+			}
+
+		case "sell":
+			{
+				symbol, b := m.Data["symbol"].(string)
+				if !b {
+					fmt.Println("Error  mbol].(string)", b)
+
+					break
+				}
+				quantity, ok := m.Data["quantity"].(float64)
+				if !ok {
+					fmt.Println("Error  .(float64)", ok)
+					break
+				}
+
+				//check if quantity available for sell
+				stock, err := getStock(&Stock{Symbol: symbol, UserId: c.id})
+				if err != nil {
+					c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Stock Not available"})
+					break
+				}
+				if stock.Quantity < int(quantity) {
+					c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Stock Added"})
+					break
+
+				}
+
+				price, company, askerror := getSellPriceAndName(symbol)
+				if askerror != nil {
+					fmt.Println("askerror ", askerror)
+					break
+				}
+				total := price * float64(quantity)
+
+				u, err := getUser(c.id)
+				if err != nil {
+					fmt.Println("get user err", err)
+
+					break
+				}
+				fmt.Println(u)
+
+				fmt.Println("Sell stock")
+				u.Balance = u.Balance + int(total)
+				err = removeStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, Company: company})
+				if err != nil {
+					fmt.Println(err)
+				}
+				updateUser(&u)
+				c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Stock Removed"})
+
 			}
 		}
 
@@ -127,12 +251,14 @@ func (c *Client) writePump() {
 func (c *Client) register(id string) {
 	isClient := connectedClients[id]
 	if isClient != nil {
-		log.Println("Client found", id)
+		log.Println("Client found", isClient.id)
+		c.id = isClient.id
+		delete(connectedClients, isClient.id)
+		connectedClients[id] = c
 	} else {
 		c.id = id
 		connectedClients[id] = c
 		log.Println("New Client Connected", id)
-		c.conn.WriteJSON(ResponseData{Typeofdata: "register", Data: "dsf"})
 	}
 
 }

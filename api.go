@@ -38,5 +38,30 @@ func getQuote(sym string) (q interface{}, e error) {
 		return
 	}
 	return
+}
 
+func getAskPriceAndName(symbol string) (f float64, name string, err error) {
+	i, e := getQuote(symbol)
+	if e != nil {
+		fmt.Println("Error getAskPrice", e)
+	}
+	quote, ok := i.(map[string]interface{})
+	if !ok {
+		fmt.Println("break")
+		return 0, "", fmt.Errorf("Parsing error")
+	}
+	return quote["askPrice"].(float64), quote["name"].(string), nil
+}
+
+func getSellPriceAndName(symbol string) (f float64, name string, err error) {
+	i, e := getQuote(symbol)
+	if e != nil {
+		fmt.Println("Error getAskPrice", e)
+	}
+	quote, ok := i.(map[string]interface{})
+	if !ok {
+		fmt.Println("break")
+		return 0, "", fmt.Errorf("Parsing error")
+	}
+	return quote["bidPrice"].(float64), quote["name"].(string), nil
 }
