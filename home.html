@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Trader</title>
+<script
+  src="https://code.jquery.com/jquery-3.1.1.js"
+  integrity="sha256-16cdPddA6VdVInumRGo6IbivbERE8p7CQR3HzTBuELA="
+  crossorigin="anonymous"></script>
+<script type="text/javascript">
+    var conn;
+
+window.onload = function () {
+  
+
+    if (window["WebSocket"]) {
+        conn = new WebSocket("ws://{{$}}/ws?token=dsfgsdhjf");
+        conn.onclose = function (evt) {
+			console.log("close",evt)
+           };
+        conn.onmessage = function (evt) {
+         console.log("onmessage",evt.data)
+       var response=$.parseJSON(evt.data);
+        console.log(response.type)
+		actionOnResponse(response)
+
+        };
+    } else {
+        var item = document.createElement("div");
+        item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
+     }
+	
+	
+	$( "#getQuote" ).click(function() {
+	console.log("Getting quote")
+ var symbol=$('#symbol').val();
+  var ask ={};
+ask.type="api";
+ask.data={};
+ask.data.name=symbol;
+	console.log("Getting quote for",ask)
+
+conn.send(JSON.stringify(ask))
+
+
+});
+
+
+
+function actionOnResponse(response){
+	
+	console.log(response.type)
+	switch (response.type){
+		case "api": apiAction(response)
+		break;
+		case "me": fillProfile(response)
+		break;
+		default:console.log("no action required")
+ 	}
+}
+
+function apiAction(response){
+	
+	  console.log(response)
+	$("#sym").text(response.data.askPrice);
+	$("#name").text(response.data.name);
+	$("#bid").text(response.data.bidPrice);
+	$("#ask").text(response.data.askPrice);
+	
+}
+
+function fillProfile(response){
+   console.log(response)
+	$("#sym").text(response.data.askPrice);
+	$("#name").text(response.data.name);
+	$("#bid").text(response.data.bidPrice);
+	$("#ask").text(response.data.askPrice);
+
+
+}
+	
+};
+
+
+
+
+</script>
+</head>
+<body>
+
+
+ 
+<input  id="symbol" value="F" />
+<button id="getQuote">Get Quote</button>
+
+
+<br>
+<br>
+symbol: <span id="sym"></span> <br>
+Name: <span id="name"></span><br>
+Bid: <span id="bid"></span><br>
+Ask: <span id="ask"></span><br>
+<input  id="quantity" value="100" />
+<button id="buy">Buy</button>
+<button id="sell">Sell</button>
+
+
+
+
+<hr>
+<br>
+<br>
+
+<table>
+  <tr>
+    <th>Company</th>
+    <th>Quantity</th>
+    <th>Price Paid</th>
+    <th>Price Paid</th>
+  </tr>
+  <tr>
+    <td>January</td>
+    <td>$100</td>
+    <td>January</td>
+    <td>$100</td>
+  </tr>
+</table>
+<div id="log"></div>
+<form id="form">
+    <input type="submit" value="Send" />
+    <input type="text" id="msg" size="64"/>
+</form>
+</body>
+</html>
