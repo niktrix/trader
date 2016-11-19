@@ -9,59 +9,53 @@ import (
 
 var url = "http://data.benzinga.com/rest/richquoteDelayed?symbols="
 
-func getQuote(sym string) (q interface{}, e error) {
+func getQuote(sym string) (q interface{}, err error) {
 	var (
 		r    *http.Response
 		body []byte
 		i    map[string]interface{}
 	)
-	r, e = http.Get(url + sym)
-	if e != nil {
-		fmt.Println("http.Ge", e)
+	r, err = http.Get(url + sym)
+	if err != nil {
 		return
 	}
-
 	defer r.Body.Close()
-	body, e = ioutil.ReadAll(r.Body)
-	if e != nil {
-		fmt.Println("hutil.ReadA", e)
-
+	body, err = ioutil.ReadAll(r.Body)
+	if err != nil {
 		return
 	}
-
-	e = json.Unmarshal(body, &i)
-
+	err = json.Unmarshal(body, &i)
 	q = i[sym]
-
-	if e != nil {
-		fmt.Println("on.Unmarsh", e)
+	if err != nil {
 		return
 	}
 	return
 }
 
 func getAskPriceAndName(symbol string) (f float64, name string, err error) {
-	i, e := getQuote(symbol)
-	if e != nil {
-		fmt.Println("Error getAskPrice", e)
+	var i interface{}
+	i, err = getQuote(symbol)
+	if err != nil {
+		return
 	}
 	quote, ok := i.(map[string]interface{})
 	if !ok {
-		fmt.Println("break")
-		return 0, "", fmt.Errorf("Parsing error")
+		err = fmt.Errorf("Parsing error")
+		return
 	}
 	return quote["askPrice"].(float64), quote["name"].(string), nil
 }
 
 func getSellPriceAndName(symbol string) (f float64, name string, err error) {
-	i, e := getQuote(symbol)
-	if e != nil {
-		fmt.Println("Error getAskPrice", e)
+	var i interface{}
+	i, err = getQuote(symbol)
+	if err != nil {
+		return
 	}
 	quote, ok := i.(map[string]interface{})
 	if !ok {
-		fmt.Println("break")
-		return 0, "", fmt.Errorf("Parsing error")
+		err = fmt.Errorf("Parsing error")
+		return
 	}
 	return quote["bidPrice"].(float64), quote["name"].(string), nil
 }

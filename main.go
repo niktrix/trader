@@ -31,7 +31,6 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	connectedClients = make(map[string]*Client)
-
 	e := readConfig()
 	if e != nil {
 		log.Fatalf("Fail in configuration", e)

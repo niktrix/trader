@@ -134,44 +134,13 @@ func (c *Client) readPump() {
 					fmt.Println("Error  .(float64)", ok)
 					break
 				}
-				log.Println(symbol)
-				log.Println(quantity)
-				price, company, askerror := getAskPriceAndName(symbol)
-				if askerror != nil {
-					fmt.Println("askerror ", askerror)
-					break
-				}
-				total := price * float64(quantity)
-				fmt.Println(total)
-
-				u, err := getUser(c.id)
-				if err != nil {
-					fmt.Println("get user err", err)
-
-					break
-				}
-				fmt.Println(u)
-
-				if float64(u.Balance) >= total {
-					fmt.Println("Buy stock")
-					u.Balance = u.Balance - int(total)
-					err := addStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, PricePaid: total, Company: company})
-					if err != nil {
-						fmt.Println(err)
-					}
-					updateUser(&u)
-					c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Stock Added"})
-
-				} else {
-					c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Not Enough Balance"})
-
-				}
+				c.buy(symbol, quantity)
 
 			}
 		case "list":
 			{
 				stocks := getPortfolio(c.id)
-				c.conn.WriteJSON(ResponseData{Typeofdata: "list", Data: stocks})
+				c.sendResponse(ResponseData{Typeofdata: "list", Data: stocks})
 
 			}
 
@@ -189,46 +158,97 @@ func (c *Client) readPump() {
 					break
 				}
 
-				//check if quantity available for sell
-				stock, err := getStock(&Stock{Symbol: symbol, UserId: c.id})
-				if err != nil {
-					c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Stock Not available"})
-					break
-				}
-				if stock.Quantity < int(quantity) {
-					c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Stock Added"})
-					break
-
-				}
-
-				price, company, askerror := getSellPriceAndName(symbol)
-				if askerror != nil {
-					fmt.Println("askerror ", askerror)
-					break
-				}
-				total := price * float64(quantity)
-
-				u, err := getUser(c.id)
-				if err != nil {
-					fmt.Println("get user err", err)
-
-					break
-				}
-				fmt.Println(u)
-
-				fmt.Println("Sell stock")
-				u.Balance = u.Balance + int(total)
-				err = removeStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, Company: company})
-				if err != nil {
-					fmt.Println(err)
-				}
-				updateUser(&u)
-				c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Stock Removed"})
+				c.sell(symbol, quantity)
 
 			}
 		}
 
 	}
+}
+
+func (c *Client) buy(symbol string, quantity float64) {
+	var (
+		err     error
+		price   float64
+		company string
+		user    User
+	)
+	price, company, err = getAskPriceAndName(symbol)
+	if err != nil {
+		return
+	}
+	total := price * float64(quantity)
+	user, err = getUser(c.id)
+	if err != nil {
+		fmt.Println("get user err", err)
+		return
+	}
+
+	if float64(user.Balance) >= total {
+		fmt.Println("Buy stock")
+		user.Balance = user.Balance - int(total)
+		err = addStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, PricePaid: total, Company: company})
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		updateUser(&user)
+		c.sendMessage("Stock Added")
+
+	} else {
+		c.sendMessage("Not Enough Balance")
+
+	}
+}
+
+func (c *Client) sell(symbol string, quantity float64) {
+	//check if quantity available for sell
+	var (
+		stock   Stock
+		err     error
+		price   float64
+		company string
+		user    User
+	)
+	stock, err = getStock(&Stock{Symbol: symbol, UserId: c.id})
+	if err != nil {
+		c.sendMessage("Stock Not available")
+		return
+	}
+	if stock.Quantity < int(quantity) {
+		c.sendMessage("Insufficient stocks available to sell")
+		return
+
+	}
+	price, company, err = getSellPriceAndName(symbol)
+	if err != nil {
+		return
+	}
+	total := price * float64(quantity)
+	user, err = getUser(c.id)
+	if err != nil {
+		c.sendMessage(fmt.Sprint("Error ", err))
+		return
+	}
+
+	user.Balance = user.Balance + int(total)
+	err = removeStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, Company: company})
+	if err != nil {
+		c.sendMessage(fmt.Sprint("Error ", err))
+		return
+	}
+	updateUser(&user)
+	c.sendMessage("Stock sold")
+}
+
+func (c *Client) sendMessage(message string) {
+	c.sendResponse(ResponseData{Typeofdata: "message", Data: message})
+
+}
+
+func (c *Client) sendResponse(response ResponseData) {
+	c.conn.WriteJSON(response)
+
 }
 
 func (c *Client) writePump() {
@@ -264,14 +284,12 @@ func (c *Client) register(id string) {
 }
 
 func serveWs(w http.ResponseWriter, r *http.Request) {
-
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	token := r.URL.Query().Get("token")
-	fmt.Println("token", token)
 
 	client := &Client{conn: conn, send: make(chan []byte, 256), id: ""}
 	client.register(token)
