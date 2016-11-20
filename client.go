@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"gopkg.in/mgo.v2"
 )
 
 const (
@@ -43,6 +44,7 @@ type Client struct {
 	conn *websocket.Conn
 	id   string
 	send chan []byte
+	db   *mgo.Database
 }
 
 type User struct {
@@ -84,8 +86,8 @@ func (c *Client) readPump() {
 		case "register":
 			{
 
-				col := database.C(dbUserTable)
-				u, er := getUser(c.id)
+				col := c.db.C(dbUserTable)
+				u, er := getUser(c.id, c.db)
 				if er != nil {
 					//create new user
 					u.UserId = c.id
@@ -140,7 +142,7 @@ func (c *Client) readPump() {
 			}
 		case "list":
 			{
-				stocks, err := getPortfolio(c.id)
+				stocks, err := getPortfolio(c.id, c.db)
 				if err != nil {
 					log.Println("List", err)
 				}
@@ -183,7 +185,7 @@ func (c *Client) buy(symbol string, quantity float64) {
 		return
 	}
 	total := price * float64(quantity)
-	user, err = getUser(c.id)
+	user, err = getUser(c.id, c.db)
 	if err != nil {
 		log.Println("get user err", err)
 
@@ -193,12 +195,12 @@ func (c *Client) buy(symbol string, quantity float64) {
 	if float64(user.Balance) >= total {
 		fmt.Println("Buy stock")
 		user.Balance = user.Balance - int(total)
-		err = addStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, PricePaid: total, Company: company})
+		err = addStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, PricePaid: total, Company: company}, c.db)
 		if err != nil {
 			log.Println("get user err", err)
 			return
 		}
-		err = updateUser(&user)
+		err = updateUser(&user, c.db)
 		if err != nil {
 			log.Println("updateUser(&user):", err)
 			return
@@ -220,7 +222,7 @@ func (c *Client) sell(symbol string, quantity float64) {
 		company string
 		user    User
 	)
-	stock, err = getStock(&Stock{Symbol: symbol, UserId: c.id})
+	stock, err = getStock(&Stock{Symbol: symbol, UserId: c.id}, c.db)
 	if err != nil {
 		c.sendMessage("Stock Not available")
 		return
@@ -235,19 +237,19 @@ func (c *Client) sell(symbol string, quantity float64) {
 		return
 	}
 	total := price * float64(quantity)
-	user, err = getUser(c.id)
+	user, err = getUser(c.id, c.db)
 	if err != nil {
 		c.sendMessage(fmt.Sprint("Error ", err))
 		return
 	}
 
 	user.Balance = user.Balance + int(total)
-	err = removeStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, Company: company})
+	err = removeStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, Company: company}, c.db)
 	if err != nil {
 		c.sendMessage(fmt.Sprint("Error ", err))
 		return
 	}
-	err = updateUser(&user)
+	err = updateUser(&user, c.db)
 	if err != nil {
 		c.sendMessage(fmt.Sprint("Error updateUser(&user) ", err))
 		return
@@ -284,6 +286,7 @@ func (c *Client) writePump() {
 
 func (c *Client) register(id string) {
 	isClient := connectedClients[id]
+	c.db = getDb()
 	if isClient != nil {
 		log.Println("Client found", isClient.id)
 		c.id = isClient.id

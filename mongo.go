@@ -8,18 +8,17 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func connect() *mgo.Database {
+func getDb() *mgo.Database {
 
 	session, err := mgo.Dial(configuration.Db.IP + ":" + configuration.Db.Port)
-	session.SetMode(mgo.Monotonic, true)
 	if err != nil {
-		panic(err)
+		log.Printf("Database connect error", err)
 	}
 	return session.Clone().DB(configuration.Db.Name)
 
 }
 
-func getUser(id string) (u User, err error) {
+func getUser(id string, database *mgo.Database) (u User, err error) {
 	col := database.C(dbUserTable)
 	err = col.Find(bson.M{"userid": id}).One(&u)
 	if err != nil {
@@ -29,7 +28,7 @@ func getUser(id string) (u User, err error) {
 	return
 }
 
-func updateUser(user *User) error {
+func updateUser(user *User, database *mgo.Database) error {
 	change, err := database.C(dbUserTable).Upsert(bson.M{"userid": user.UserId}, user)
 	if err != nil {
 		return err
@@ -46,7 +45,7 @@ type Stock struct {
 	Company   string
 }
 
-func getStock(st *Stock) (stock Stock, err error) {
+func getStock(st *Stock, database *mgo.Database) (stock Stock, err error) {
 	err = database.C(dbStockTable).Find(bson.M{"symbol": st.Symbol, "userid": st.UserId}).One(&stock)
 	if err != nil {
 		return
@@ -54,8 +53,8 @@ func getStock(st *Stock) (stock Stock, err error) {
 	return
 }
 
-func addStock(newStock *Stock) error {
-	oldStock, e := getStock(newStock)
+func addStock(newStock *Stock, database *mgo.Database) error {
+	oldStock, e := getStock(newStock, database)
 	//stock found update
 	if e == nil {
 		newStock.Quantity = oldStock.Quantity + newStock.Quantity
@@ -68,8 +67,8 @@ func addStock(newStock *Stock) error {
 	return nil
 }
 
-func removeStock(newStock *Stock) error {
-	oldStock, e := getStock(newStock)
+func removeStock(newStock *Stock, database *mgo.Database) error {
+	oldStock, e := getStock(newStock, database)
 	//stock found update
 	if e == nil {
 		newStock.Quantity = oldStock.Quantity - newStock.Quantity
@@ -81,7 +80,7 @@ func removeStock(newStock *Stock) error {
 	return nil
 }
 
-func getPortfolio(id string) (stocks []Stock, err error) {
+func getPortfolio(id string, database *mgo.Database) (stocks []Stock, err error) {
 	err = database.C(dbStockTable).Find(bson.M{"userid": id}).All(&stocks)
 	if err != nil {
 		return

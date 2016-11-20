@@ -4,18 +4,16 @@ import (
 	"log"
 	"net/http"
 	"text/template"
-
-	"gopkg.in/mgo.v2"
 )
 
 var homeTemplate = template.Must(template.ParseFiles("home.html"))
 
 var (
 	configuration Configuration
-	database      *mgo.Database
 )
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.URL)
 	if r.URL.Path != "/" {
 		http.Error(w, "Not found", 404)
 		return
@@ -34,7 +32,6 @@ func main() {
 	if e != nil {
 		log.Fatalf("Fail in configuration", e)
 	}
-	database = connect()
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(w, r)
