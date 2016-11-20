@@ -192,7 +192,11 @@ func (c *Client) buy(symbol string, quantity float64) {
 			fmt.Println(err)
 			return
 		}
-		updateUser(&user)
+		err = updateUser(&user)
+		if err != nil {
+			log.Println("updateUser(&user):", err)
+			return
+		}
 		c.sendMessage("Stock Added")
 
 	} else {

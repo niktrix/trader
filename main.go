@@ -38,7 +38,6 @@ func main() {
 	database = connect()
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		log.Println(r.URL)
 		serveWs(w, r)
 	})
 	log.Println("Running server at ", configuration.Port)
