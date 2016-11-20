@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -10,6 +11,7 @@ import (
 func connect() *mgo.Database {
 
 	session, err := mgo.Dial(configuration.Db.IP + ":" + configuration.Db.Port)
+	session.SetMode(mgo.Monotonic, true)
 	if err != nil {
 		panic(err)
 	}
@@ -21,6 +23,7 @@ func getUser(id string) (u User, err error) {
 	col := database.C(dbUserTable)
 	err = col.Find(bson.M{"userid": id}).One(&u)
 	if err != nil {
+		log.Println("Err getUser:", err)
 		return
 	}
 	return

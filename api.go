@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 )
 
@@ -17,18 +18,22 @@ func getQuote(sym string) (q interface{}, err error) {
 	)
 	r, err = http.Get(url + sym)
 	if err != nil {
+		log.Println("Error getQuote http GEt:", err)
 		return
 	}
 	defer r.Body.Close()
 	body, err = ioutil.ReadAll(r.Body)
 	if err != nil {
+		log.Println("Error getQuote ReadAll GEt:", err)
 		return
 	}
 	err = json.Unmarshal(body, &i)
-	q = i[sym]
 	if err != nil {
+		log.Println("Error getQuote Unmarshal GEt:", err)
 		return
 	}
+	q = i[sym]
+
 	return
 }
 
