@@ -15,7 +15,7 @@ func connect() *mgo.Database {
 	if err != nil {
 		panic(err)
 	}
-	return session.DB(configuration.Db.Name)
+	return session.Clone().DB(configuration.Db.Name)
 
 }
 
@@ -81,7 +81,10 @@ func removeStock(newStock *Stock) error {
 	return nil
 }
 
-func getPortfolio(id string) (stocks []Stock) {
-	database.C(dbStockTable).Find(bson.M{"userid": id}).All(&stocks)
+func getPortfolio(id string) (stocks []Stock, err error) {
+	err = database.C(dbStockTable).Find(bson.M{"userid": id}).All(&stocks)
+	if err != nil {
+		return
+	}
 	return
 }

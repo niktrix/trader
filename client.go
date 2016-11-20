@@ -83,7 +83,7 @@ func (c *Client) readPump() {
 		switch m.Typeofdata {
 		case "register":
 			{
-				log.Println("-----")
+
 				col := database.C(dbUserTable)
 				u, er := getUser(c.id)
 				if er != nil {
@@ -102,19 +102,21 @@ func (c *Client) readPump() {
 			}
 		case "api":
 			{
+				log.Println("api called")
 				log.Println("m.Data", m.Data["name"])
 				name, ie := m.Data["name"].(string)
 				if !ie {
-					fmt.Println("Error ", ie)
+					log.Println("Error ", ie)
 					break
 
 				}
 				i, e := getQuote(name)
 				if e != nil {
-					fmt.Println("Error ", e)
+					log.Println("Error ", e)
 					break
 				}
 				if i == nil {
+					log.Println("i == nil ", i)
 					c.conn.WriteJSON(ResponseData{Typeofdata: "message", Data: "Wrong stock symbol"})
 					break
 				}
@@ -126,7 +128,6 @@ func (c *Client) readPump() {
 				symbol, b := m.Data["symbol"].(string)
 				if !b {
 					fmt.Println("Error  mbol].(string)", b)
-
 					break
 				}
 				quantity, ok := m.Data["quantity"].(float64)
@@ -139,7 +140,10 @@ func (c *Client) readPump() {
 			}
 		case "list":
 			{
-				stocks := getPortfolio(c.id)
+				stocks, err := getPortfolio(c.id)
+				if err != nil {
+					log.Println("List", err)
+				}
 				c.sendResponse(ResponseData{Typeofdata: "list", Data: stocks})
 
 			}
@@ -175,12 +179,14 @@ func (c *Client) buy(symbol string, quantity float64) {
 	)
 	price, company, err = getAskPriceAndName(symbol)
 	if err != nil {
+		log.Println("getAskPriceAndName", err)
 		return
 	}
 	total := price * float64(quantity)
 	user, err = getUser(c.id)
 	if err != nil {
-		fmt.Println("get user err", err)
+		log.Println("get user err", err)
+
 		return
 	}
 
@@ -189,7 +195,7 @@ func (c *Client) buy(symbol string, quantity float64) {
 		user.Balance = user.Balance - int(total)
 		err = addStock(&Stock{Quantity: int(quantity), Symbol: symbol, UserId: c.id, PricePaid: total, Company: company})
 		if err != nil {
-			fmt.Println(err)
+			log.Println("get user err", err)
 			return
 		}
 		err = updateUser(&user)
@@ -241,7 +247,11 @@ func (c *Client) sell(symbol string, quantity float64) {
 		c.sendMessage(fmt.Sprint("Error ", err))
 		return
 	}
-	updateUser(&user)
+	err = updateUser(&user)
+	if err != nil {
+		c.sendMessage(fmt.Sprint("Error updateUser(&user) ", err))
+		return
+	}
 	c.sendMessage("Stock sold")
 }
 

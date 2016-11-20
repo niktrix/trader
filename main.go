@@ -16,7 +16,6 @@ var (
 )
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL)
 	if r.URL.Path != "/" {
 		http.Error(w, "Not found", 404)
 		return
